@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Algo 2 - Tomita Maximal Cliques</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Algorithm 2: Tomita Maximal Cliques</h1>
+
+        <!-- Histograms Section -->
+        <div class="histograms">
+            <div class="histogram">
+                <img src="khushWiki.png" alt="Wiki Histogram">
+                <table>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Value</th>
+                    </tr>
+                    <tr>
+                        <td>Largest Clique Size</td>
+                        <td>17</td>
+                    </tr>
+                    <tr>
+                        <td>Total number of maximal cliques</td>
+                        <td>459002</td>
+                    </tr>
+                    <tr>
+                        <td>Execution time</td>
+                        <td>22613 ms</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="histogram">
+                <img src="KhushEnron.png" alt="Enron Histogram">
+                <table>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Value</th>
+                    </tr>
+                    <tr>
+                        <td>Largest Clique Size</td>
+                        <td>20</td>
+                    </tr>
+                    <tr>
+                        <td>Total number of maximal cliques</td>
+                        <td>226859</td>
+                    </tr>
+                    <tr>
+                        <td>Execution time</td>
+                        <td>231899 ms</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="histogram">
+                <img src="DakshSkitter.png" alt="Skitter Histogram">
+                <table>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Value</th>
+                    </tr>
+                    <tr>
+                        <td>Largest Clique Size</td>
+                        <td>67</td>
+                    </tr>
+                    <tr>
+                        <td>Total number of maximal cliques</td>
+                        <td>37322004</td>
+                    </tr>
+                    <tr>
+                        <td>Execution time</td>
+                        <td>3351.14 seconds</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Source Code Section -->
+        <div class="source-code">
+            <h2>Source Code</h2>
+<pre><code>#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;unordered_set&gt;
+#include &lt;unordered_map&gt;
+#include &lt;map&gt;
+#include &lt;chrono&gt;
+#include &lt;algorithm&gt;
+#include &lt;iomanip&gt;
+
+using namespace std;
+using namespace std::chrono;
+
+typedef unordered_set&lt;int&gt; IntSet;
+
+vector&lt;int&gt; maximalCliqueSizes;  // Stores sizes of all maximal cliques
+int totalMaximalCliques = 0;     // Total count of maximal cliques
+
+// ------------------------- Pivot Selection -------------------------
+int choosePivot(const IntSet &amp;cand, const IntSet &amp;fin, const vector&lt;IntSet&gt; &amp;graph) {
+    int bestPivot = -1, bestCount = -1;
+    for (int u : cand) {
+        int count = 0;
+        for (int w : cand) 
+            if (graph[u].count(w)) count++;
+        if (count &gt; bestCount) {
+            bestCount = count;
+            bestPivot = u;
+        }
+    }
+    if (bestPivot == -1) {
+        for (int u : fin) {
+            int count = 0;
+            for (int w : cand) 
+                if (graph[u].count(w)) count++;
+            if (count &gt; bestCount) bestPivot = u;
+        }
+    }
+    return bestPivot;
+}
+
+// ------------------------- Clique Enumeration -------------------------
+void tomitaClique(vector&lt;int&gt; &amp;clique, IntSet &amp;cand, IntSet &amp;fin, const vector&lt;IntSet&gt; &amp;graph) {
+    if (cand.empty() &amp;&amp; fin.empty()) {
+        maximalCliqueSizes.push_back(clique.size());
+        totalMaximalCliques++;
+        return;
+    }
+
+    int pivot = choosePivot(cand, fin, graph);
+    IntSet ext;
+    for (int v : cand) {
+        if (!graph[pivot].count(v)) ext.insert(v);
+    }
+
+    for (int v : ext) {
+        clique.push_back(v);
+        IntSet newCand, newFin;
+        for (int w : cand) if (graph[v].count(w)) newCand.insert(w);
+        for (int w : fin) if (graph[v].count(w)) newFin.insert(w);
+        
+        tomitaClique(clique, newCand, newFin, graph);
+        
+        clique.pop_back();
+        cand.erase(v);
+        fin.insert(v);
+    }
+}
+
+// ------------------------- Main Function -------------------------
+int main() {
+    string filename = "Email-Enron.txt";
+    ifstream infile(filename);
+    if (!infile.is_open()) {
+        cerr &lt;&lt; "Error: Cannot open file " &lt;&lt; filename &lt;&lt; "\n";
+        return 1;
+    }
+
+    // Read graph data and build adjacency list directly
+    unordered_map&lt;int, int&gt; idMapping;
+    vector&lt;IntSet&gt; graph;
+    int u, v;
+    string line;
+
+    while (getline(infile, line)) {
+        if (line.empty() || line[0] == '#') continue;
+        istringstream iss(line);
+        if (!(iss &gt;&gt; u &gt;&gt; v)) continue;
+
+        // Map node IDs to contiguous indices
+        if (!idMapping.count(u)) {
+            idMapping[u] = graph.size();
+            graph.push_back(IntSet());
+        }
+        if (!idMapping.count(v)) {
+            idMapping[v] = graph.size();
+            graph.push_back(IntSet());
+        }
+
+        int a = idMapping[u], b = idMapping[v];
+        if (a != b) {
+            graph[a].insert(b);
+            graph[b].insert(a);
+        }
+    }
+    infile.close();
+
+    cout &lt;&lt; "Graph loaded with " &lt;&lt; graph.size() &lt;&lt; " nodes.\n";
+
+    // Initialize candidate set with all vertices
+    IntSet cand;
+    for (int i = 0; i &lt; graph.size(); i++) cand.insert(i);
+    
+    vector&lt;int&gt; clique;
+    auto start = high_resolution_clock::now();
+    IntSet fin;  
+    tomitaClique(clique, cand, fin, graph);
+    auto end = high_resolution_clock::now();
+
+    // Compute metrics
+    int largestSize = 0;
+    map&lt;int, int&gt; sizeFrequency;
+    for (int size : maximalCliqueSizes) {
+        largestSize = max(largestSize, size);
+        sizeFrequency[size]++;
+    }
+
+    // Print results
+    cout &lt;&lt; "\n=== Results ===\n"
+         &lt;&lt; "Largest maximal clique size: " &lt;&lt; largestSize &lt;&lt; "\n"
+         &lt;&lt; "Total maximal cliques: " &lt;&lt; maximalCliqueSizes.size() &lt;&lt; "\n"
+         &lt;&lt; "Execution time: " &lt;&lt; duration_cast&lt;milliseconds&gt;(end - start).count() &lt;&lt; " ms\n"
+         &lt;&lt; "\nSize distribution:\n";
+    
+    for (const auto &amp;entry : sizeFrequency) {
+        cout &lt;&lt; "Size " &lt;&lt; entry.first &lt;&lt; ": " &lt;&lt; entry.second &lt;&lt; " cliques\n";
+    }
+
+    return 0;
+}</code></pre>
+        </div>
+
+        <div class="histogram-section">
+            <h2>Execution Times</h2>
+            <img src="DakshHist.png" alt="Execution Times Histogram">
+        </div>
+
+    </div>
+</body>
+</html>
