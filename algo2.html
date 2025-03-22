@@ -10,10 +10,15 @@
     <div class="container">
         <h1>Algorithm 2: Tomita Maximal Cliques</h1>
 
+        <div class="note">
+            <p><strong>NOTE:</strong> Click on each image to get the number of maximal cliques of each size.
+        </div>
         <!-- Histograms Section -->
         <div class="histograms">
             <div class="histogram">
-                <img src="khushWiki.png" alt="Wiki Histogram">
+                <a href = "DakshWikiBig.png" target="_blank">
+                <img src="dakshWiki.png" alt="Wiki Histogram">
+                </a>
                 <table>
                     <tr>
                         <th>Metric</th>
@@ -28,14 +33,21 @@
                         <td>459002</td>
                     </tr>
                     <tr>
-                        <td>Execution time</td>
-                        <td>22613 ms</td>
+                        <td>Execution time with Parallelization</td>
+                        <td>0.515 seconds</td>
+                    </tr>
+                    <tr>
+                        <td>Execution time without Parallelization</td>
+                        <td>10.504 seconds</td>
                     </tr>
                 </table>
+            </br>
             </div>
 
             <div class="histogram">
-                <img src="KhushEnron.png" alt="Enron Histogram">
+                <a href = "DakshEnronBig.png" target="_blank">
+                <img src="DakshEnron.png" alt="Enron Histogram">
+            </a>
                 <table>
                     <tr>
                         <th>Metric</th>
@@ -50,14 +62,19 @@
                         <td>226859</td>
                     </tr>
                     <tr>
-                        <td>Execution time</td>
-                        <td>231899 ms</td>
+                        <td>Execution time with Parallelization</td>
+                        <td>1.666 seconds</td>
+                    </tr>
+                    <tr>
+                        <td>Execution time without Parallelization</td>
+                        <td>53.263 seconds</td>
                     </tr>
                 </table>
             </div>
 
             <div class="histogram">
-                <img src="DakshSkitter.png" alt="Skitter Histogram">
+                <a href = "DakshSkitterBig.png" target="_blank">
+                <img src="DakshSkitter.png" alt="Skitter Histogram"> </a>
                 <table>
                     <tr>
                         <th>Metric</th>
@@ -72,163 +89,187 @@
                         <td>37322004</td>
                     </tr>
                     <tr>
-                        <td>Execution time</td>
-                        <td>3351.14 seconds</td>
+                        <td>Execution time with Parallelization</td>
+                        <td>4674.17 seconds</td>
+                    </tr>
+                    <tr>
+                        <td>Execution time without Parallelization</td>
+                        <td>More than 12 Hours</td>
                     </tr>
                 </table>
             </div>
+            
         </div>
 
         <!-- Source Code Section -->
         <div class="source-code">
             <h2>Source Code</h2>
-<pre><code>#include &lt;iostream&gt;
-#include &lt;fstream&gt;
-#include &lt;sstream&gt;
-#include &lt;string&gt;
-#include &lt;vector&gt;
-#include &lt;unordered_set&gt;
-#include &lt;unordered_map&gt;
-#include &lt;map&gt;
+<pre><code>#include &lt;bits/stdc++.h&gt;
+#include &lt;omp.h&gt;
 #include &lt;chrono&gt;
-#include &lt;algorithm&gt;
-#include &lt;iomanip&gt;
-
 using namespace std;
 using namespace std::chrono;
 
-typedef unordered_set&lt;int&gt; IntSet;
+// Global result storage (updated in critical sections)
+vector&lt;int&gt; globalCliqueSizes;  // Stores sizes of all maximal cliques found
+long long globalTotalCliques = 0;
+int globalMaxCliqueSize = 0;
 
-vector&lt;int&gt; maximalCliqueSizes;  // Stores sizes of all maximal cliques
-int totalMaximalCliques = 0;     // Total count of maximal cliques
-
-// ------------------------- Pivot Selection -------------------------
-int choosePivot(const IntSet &amp;cand, const IntSet &amp;fin, const vector&lt;IntSet&gt; &amp;graph) {
+// -----------------------------------------------------------------------------
+// Pivot selection: Choose u from (CAND ∪ FINI) that maximizes the number of neighbors in CAND.
+int choosePivot(const unordered_set&lt;int&gt;&amp; CAND, const unordered_set&lt;int&gt;&amp; FINI, const vector&lt;unordered_set&lt;int&gt;&gt;&amp; graph) {
     int bestPivot = -1, bestCount = -1;
-    for (int u : cand) {
+    unordered_set&lt;int&gt; unionSet = CAND;
+    unionSet.insert(FINI.begin(), FINI.end());
+    for (int u : unionSet) {
         int count = 0;
-        for (int w : cand) 
-            if (graph[u].count(w)) count++;
+        for (int w : CAND)
+            if (graph[u].count(w))
+                count++;
         if (count &gt; bestCount) {
             bestCount = count;
             bestPivot = u;
         }
     }
-    if (bestPivot == -1) {
-        for (int u : fin) {
-            int count = 0;
-            for (int w : cand) 
-                if (graph[u].count(w)) count++;
-            if (count &gt; bestCount) bestPivot = u;
-        }
-    }
     return bestPivot;
 }
 
-// ------------------------- Clique Enumeration -------------------------
-void tomitaClique(vector&lt;int&gt; &amp;clique, IntSet &amp;cand, IntSet &amp;fin, const vector&lt;IntSet&gt; &amp;graph) {
-    if (cand.empty() &amp;&amp; fin.empty()) {
-        maximalCliqueSizes.push_back(clique.size());
-        totalMaximalCliques++;
+// -----------------------------------------------------------------------------
+// Tomita Recursive Function (in-place update of CAND and FINI)
+// 
+// This implementation follows the standard recurrence:
+//   if (CAND and FINI are empty) then output clique
+//   else, choose pivot u; for each v in (CAND \ N(u)):
+//       Recurse with: Q U {v}, CAND ∩ N(v), FINI ∩ N(v)
+//       Then remove v from CAND and add it to FINI
+// This prevents overcounting of maximal cliques.
+void tomitaClique(vector&lt;int&gt;&amp; clique, unordered_set&lt;int&gt;&amp; CAND, unordered_set&lt;int&gt;&amp; FINI, const vector&lt;unordered_set&lt;int&gt;&gt;&amp; graph) {
+    if (CAND.empty() &amp;&amp; FINI.empty()) {
+        int size = clique.size();
+        #pragma omp critical
+        {
+            globalCliqueSizes.push_back(size);
+            globalTotalCliques++;
+            globalMaxCliqueSize = max(globalMaxCliqueSize, size);
+        }
         return;
     }
-
-    int pivot = choosePivot(cand, fin, graph);
-    IntSet ext;
-    for (int v : cand) {
-        if (!graph[pivot].count(v)) ext.insert(v);
+    
+    int pivot = choosePivot(CAND, FINI, graph);
+    // ext = CAND \ N(pivot)
+    unordered_set&lt;int&gt; ext;
+    for (int v : CAND) {
+        if (!graph[pivot].count(v))
+            ext.insert(v);
     }
-
-    for (int v : ext) {
+    
+    // Iterate over a copy of ext since we'll modify CAND during the loop.
+    vector&lt;int&gt; extVec(ext.begin(), ext.end());
+    for (int v : extVec) {
         clique.push_back(v);
-        IntSet newCand, newFin;
-        for (int w : cand) if (graph[v].count(w)) newCand.insert(w);
-        for (int w : fin) if (graph[v].count(w)) newFin.insert(w);
         
-        tomitaClique(clique, newCand, newFin, graph);
+        // Build new candidate set: newCAND = CAND ∩ N(v)
+        unordered_set&lt;int&gt; newCAND;
+        for (int w : CAND) {
+            if (graph[v].count(w))
+                newCAND.insert(w);
+        }
+        
+        // Build new finished set: newFINI = FINI ∩ N(v)
+        unordered_set&lt;int&gt; newFINI;
+        for (int w : FINI) {
+            if (graph[v].count(w))
+                newFINI.insert(w);
+        }
+        
+        // Recurse with the new sets.
+        tomitaClique(clique, newCAND, newFINI, graph);
         
         clique.pop_back();
-        cand.erase(v);
-        fin.insert(v);
+        // Remove v from CAND and add it to FINI to avoid duplicates.
+        CAND.erase(v);
+        FINI.insert(v);
     }
 }
 
-// ------------------------- Main Function -------------------------
-int main() {
-    string filename = "Email-Enron.txt";
-    ifstream infile(filename);
-    if (!infile.is_open()) {
-        cerr &lt;&lt; "Error: Cannot open file " &lt;&lt; filename &lt;&lt; "\n";
-        return 1;
+// -----------------------------------------------------------------------------
+// Main Function
+//
+// Reads the input file (with format described above). The outer loop (over vertices)
+// is parallelized with OpenMP. For each vertex i, we build its candidate set (neighbors with index &gt; i)
+// and finished set (neighbors with index &lt; i), then call the recursive routine.
+int main(int argc, char* argv[]){
+    if(argc != 2){
+         cerr &lt;&lt; "Usage: &lt;executable&gt; &lt;input_file&gt;" &lt;&lt; endl;
+         return 1;
     }
-
-    // Read graph data and build adjacency list directly
-    unordered_map&lt;int, int&gt; idMapping;
-    vector&lt;IntSet&gt; graph;
+    ifstream infile(argv[1]);
+    if(!infile){
+         cerr &lt;&lt; "Error: Could not open file " &lt;&lt; argv[1] &lt;&lt; endl;
+         return 1;
+    }
+    
+    int n, m;
+    infile &gt;&gt; n &gt;&gt; m;
+    vector&lt;unordered_set&lt;int&gt;&gt; graph(n);
     int u, v;
-    string line;
-
-    while (getline(infile, line)) {
-        if (line.empty() || line[0] == '#') continue;
-        istringstream iss(line);
-        if (!(iss &gt;&gt; u &gt;&gt; v)) continue;
-
-        // Map node IDs to contiguous indices
-        if (!idMapping.count(u)) {
-            idMapping[u] = graph.size();
-            graph.push_back(IntSet());
-        }
-        if (!idMapping.count(v)) {
-            idMapping[v] = graph.size();
-            graph.push_back(IntSet());
-        }
-
-        int a = idMapping[u], b = idMapping[v];
-        if (a != b) {
-            graph[a].insert(b);
-            graph[b].insert(a);
-        }
+    for (int i = 0; i &lt; m; i++){
+         infile &gt;&gt; u &gt;&gt; v;
+         // Assume vertices are 0-based and 0 &lt;= u,v &lt; n.
+         if(u &lt; 0 || u &gt;= n || v &lt; 0 || v &gt;= n) continue;
+         if(u != v){
+             graph[u].insert(v);
+             graph[v].insert(u);
+         }
     }
     infile.close();
-
-    cout &lt;&lt; "Graph loaded with " &lt;&lt; graph.size() &lt;&lt; " nodes.\n";
-
-    // Initialize candidate set with all vertices
-    IntSet cand;
-    for (int i = 0; i &lt; graph.size(); i++) cand.insert(i);
+    cout &lt;&lt; "Graph loaded with " &lt;&lt; n &lt;&lt; " nodes and " &lt;&lt; m &lt;&lt; " edges." &lt;&lt; endl;
     
-    vector&lt;int&gt; clique;
-    auto start = high_resolution_clock::now();
-    IntSet fin;  
-    tomitaClique(clique, cand, fin, graph);
-    auto end = high_resolution_clock::now();
-
-    // Compute metrics
-    int largestSize = 0;
-    map&lt;int, int&gt; sizeFrequency;
-    for (int size : maximalCliqueSizes) {
-        largestSize = max(largestSize, size);
-        sizeFrequency[size]++;
-    }
-
-    // Print results
-    cout &lt;&lt; "\n=== Results ===\n"
-         &lt;&lt; "Largest maximal clique size: " &lt;&lt; largestSize &lt;&lt; "\n"
-         &lt;&lt; "Total maximal cliques: " &lt;&lt; maximalCliqueSizes.size() &lt;&lt; "\n"
-         &lt;&lt; "Execution time: " &lt;&lt; duration_cast&lt;milliseconds&gt;(end - start).count() &lt;&lt; " ms\n"
-         &lt;&lt; "\nSize distribution:\n";
+    auto start_time = high_resolution_clock::now();
     
-    for (const auto &amp;entry : sizeFrequency) {
-        cout &lt;&lt; "Size " &lt;&lt; entry.first &lt;&lt; ": " &lt;&lt; entry.second &lt;&lt; " cliques\n";
+    // Parallelize the outer loop so that each vertex i is processed in parallel.
+    #pragma omp parallel for schedule(dynamic)
+    for (int i = 0; i &lt; n; i++){
+         unordered_set&lt;int&gt; CAND, FINI;
+         // For vertex i, candidate set: all neighbors with index &gt; i.
+         for (int j = i + 1; j &lt; n; j++){
+              if (graph[i].count(j))
+                   CAND.insert(j);
+         }
+         // Finished set: all neighbors with index &lt; i.
+         for (int j = 0; j &lt; i; j++){
+              if (graph[i].count(j))
+                   FINI.insert(j);
+         }
+         vector&lt;int&gt; clique;
+         clique.push_back(i);
+         tomitaClique(clique, CAND, FINI, graph);
     }
-
+    
+    auto end_time = high_resolution_clock::now();
+    double exec_time = duration_cast&lt;milliseconds&gt;(end_time - start_time).count()/1000.0;
+    
+    // Compute frequency distribution of clique sizes.
+    map&lt;int, int&gt; sizeDist;
+    for (int size : globalCliqueSizes)
+         sizeDist[size]++;
+    
+    // Output results.
+    cout &lt;&lt; "\n=== Results ===" &lt;&lt; endl;
+    cout &lt;&lt; "Total maximal cliques: " &lt;&lt; globalTotalCliques &lt;&lt; endl;
+    cout &lt;&lt; "Largest maximal clique size: " &lt;&lt; globalMaxCliqueSize &lt;&lt; endl;
+    cout &lt;&lt; "Execution time: " &lt;&lt; exec_time &lt;&lt; " seconds" &lt;&lt; endl;
+    cout &lt;&lt; "Distribution of maximal clique sizes:" &lt;&lt; endl;
+    for (auto &amp;p : sizeDist)
+         cout &lt;&lt; "  Size " &lt;&lt; p.first &lt;&lt; ": " &lt;&lt; p.second &lt;&lt; " cliques" &lt;&lt; endl;
+    
     return 0;
 }</code></pre>
         </div>
 
         <div class="histogram-section">
             <h2>Execution Times</h2>
-            <img src="DakshHist.png" alt="Execution Times Histogram">
+            <img src="KhushHist.png" alt="Execution Times Histogram">
         </div>
 
     </div>
