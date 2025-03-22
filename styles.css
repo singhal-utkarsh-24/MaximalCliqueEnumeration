@@ -218,3 +218,26 @@ table td {
     border-radius: 8px; /* Rounded corners */
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Subtle shadow */
 }
+
+
+/* Back to Home Button */
+.back-button {
+    text-align: center; /* Center the button */
+    margin-top: 40px; /* Add space above the button */
+    margin-bottom: 20px; /* Add space below the button */
+}
+
+.back-button .button {
+    display: inline-block; /* Make the link behave like a button */
+    padding: 10px 20px; /* Add padding */
+    background-color: #007bff; /* Blue background */
+    color: #fff; /* White text */
+    text-decoration: none; /* Remove underline */
+    border-radius: 5px; /* Rounded corners */
+    font-size: 16px; /* Font size */
+    transition: background-color 0.3s ease; /* Smooth hover effect */
+}
+
+.back-button .button:hover {
+    background-color: #0056b3; /* Darker blue on hover */
+}
