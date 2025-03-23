@@ -33,12 +33,8 @@
                         <td>459002</td>
                     </tr>
                     <tr>
-                        <td>Execution time with Parallelization</td>
-                        <td>0.515 seconds</td>
-                    </tr>
-                    <tr>
                         <td>Execution time without Parallelization</td>
-                        <td>10.504 seconds</td>
+                        <td>4346.8 sec ~ 1.2 hrs</td>
                     </tr>
                 </table>
             </br>
@@ -62,12 +58,8 @@
                         <td>226859</td>
                     </tr>
                     <tr>
-                        <td>Execution time with Parallelization</td>
-                        <td>1.666 seconds</td>
-                    </tr>
-                    <tr>
                         <td>Execution time without Parallelization</td>
-                        <td>53.263 seconds</td>
+                        <td>11835.2 sec ~ 3.29 hrs</td>
                     </tr>
                 </table>
             </div>
@@ -89,12 +81,8 @@
                         <td>37322355</td>
                     </tr>
                     <tr>
-                        <td>Execution time with Parallelization</td>
-                        <td>4674.17 seconds</td>
-                    </tr>
-                    <tr>
                         <td>Execution time without Parallelization</td>
-                        <td>More than 12 Hours</td>
+                        <td> > 18 hrs </td>
                     </tr>
                 </table>
             </div>
@@ -103,159 +91,188 @@
 
         <!-- Source Code Section -->
         <div class="source-code">
-            <h2>Source Code</h2>
-<pre><code>#include &lt;iostream&gt;
-#include &lt;fstream&gt;
-#include &lt;vector&gt;
-#include &lt;unordered_set&gt;
-#include &lt;algorithm&gt;
-#include &lt;chrono&gt;
-#include &lt;map&gt;
-#include &lt;omp.h&gt; // OpenMP for parallelization
-
-using namespace std;
-
-class CliqueFinder {
-public:
-    int n;
-    vector&lt;unordered_set&lt;int&gt;&gt; adjList;
-    vector&lt;int&gt; vertexOrder;
-    map&lt;int, int&gt; cliqueSizeCount;
-    int totalCliques = 0;
-    int maxCliqueSize = 0;
-    vector&lt;bool&gt; inClique; // Track membership for efficient lookup
-
-    CliqueFinder(int n) : n(n), inClique(n, false) {
-        adjList.resize(n);
-    }
-
-    void addEdge(int u, int v) {
-        adjList[u].insert(v);
-        adjList[v].insert(u);
-    }
-
-    void sortVerticesByDegree() {
-        vector&lt;pair&lt;int, int&gt;&gt; degreeList;
-        for (int i = 0; i &lt; n; ++i) {
-            degreeList.emplace_back(adjList[i].size(), i);
-        }
-        sort(degreeList.begin(), degreeList.end(), [](const pair&lt;int, int&gt; &amp;a, const pair&lt;int, int&gt; &amp;b) {
-            return a.first &gt; b.first;
-        });
-
-        vertexOrder.resize(n);
-        for (int i = 0; i &lt; n; i++) {
-            vertexOrder[i] = degreeList[i].second;
-        }
-    }
-
-    bool isMaximalClique(const vector&lt;int&gt; &amp;C) {
-        for (int v = 0; v &lt; n; ++v) {
-            if (!inClique[v]) {
-                bool isAdjacentToAll = true;
-                for (int u : C) {
-                    if (adjList[u].find(v) == adjList[u].end()) {
-                        isAdjacentToAll = false;
-                        break;
+            <h2>Source Code (Non-Parallelized)</h2>
+            <pre><code>
+                /*
+                usage : 
+                Compilation : g++ -std=c++17 Chiba.cpp -o Chiba
+                Run : ./Chiba input.txt
+                */
+                
+                #include &lt;iostream&gt;
+                #include &lt;fstream&gt;
+                #include &lt;vector&gt;
+                #include &lt;unordered_set&gt;
+                #include &lt;algorithm&gt;
+                #include &lt;chrono&gt;
+                #include &lt;map&gt;
+                
+                using namespace std;
+                
+                class CliqueFinder {
+                public:
+                    int count1000s = 0;
+                    int n;
+                    vector&lt;unordered_set&lt;int&gt;&gt; adjList;
+                    vector&lt;int&gt; vertexOrder;
+                    map&lt;int, int&gt; cliqueSizeCount;
+                    int totalCliques = 0;
+                    int maxCliqueSize = 0;
+                
+                    CliqueFinder(int n) : n(n) {
+                        adjList.resize(n);
                     }
+                
+                    void addEdge(int u, int v) {
+                        adjList[u].insert(v);
+                        adjList[v].insert(u);
+                    }
+                
+                    // Step 1: Sort vertices based on degree d(1) ≤ d(2) ≤ ... ≤ d(n)
+                
+                    void sortVerticesByDegree() {
+                        vector&lt;pair&lt;int, int&gt;&gt; degreeList;
+                        for (int i = 0; i &lt; n; ++i) {
+                            degreeList.emplace_back(adjList[i].size(), i);
+                        }
+                        sort(degreeList.begin(), degreeList.end(), [](const pair&lt;int, int&gt; &a, const pair&lt;int, int&gt; &b) {
+                            return a.first &gt; b.first;
+                        });
+                
+                        vertexOrder.resize(n);
+                        for (int i = 0; i &lt; n; i++) {
+                            vertexOrder[i] = degreeList[i].second;
+                        }
+                    }
+                
+                    // Step 4: Check maximality of clique
+                    bool isMaximalClique(const unordered_set&lt;int&gt; &C) {
+                        for (int v = 0; v &lt; n; ++v) {
+                            if (C.find(v) == C.end()) {  // If v is not in the current clique
+                                bool isAdjacentToAll = true;
+                                for (int u : C) {
+                                    if (adjList[u].find(v) == adjList[u].end()) {
+                                        isAdjacentToAll = false;
+                                        break;
+                                    }
+                                }
+                                if (isAdjacentToAll) return false; // Not maximal if v connects to all in C
+                            }
+                        }
+                        return true;
+                    }
+                
+                    // Step 5: Lexicographical order test
+                    bool lexicographicalTest(const unordered_set&lt;int&gt; &C, int v) {
+                        if (C.empty()) return true;
+                
+                        vector&lt;int&gt; cliqueMembers(C.begin(), C.end());
+                        sort(cliqueMembers.begin(), cliqueMembers.end());
+                
+                        // enforce lexicographic order
+                        for (size_t i = 1; i &lt; cliqueMembers.size(); i++) {
+                            if (cliqueMembers[i] &lt; cliqueMembers[i - 1]) {
+                                return false;  
+                            }
+                        }
+                
+                        // If v is smaller than the first element, it maintains lexicographic order
+                        if (v &lt; *cliqueMembers.begin()) {
+                            return true;  
+                        }
+                
+                        return true; 
+                    }
+                
+                    void findCliques() {
+                        sortVerticesByDegree();
+                        unordered_set&lt;int&gt; C;
+                        update(0, C);
+                    }
+                
+                    void update(int i, unordered_set&lt;int&gt; &C) {
+                        if (i == n) {
+                            if (!C.empty() && isMaximalClique(C)) {
+                                cliqueSizeCount[C.size()]++;
+                                totalCliques++;
+                                if(totalCliques &gt; 1000 && totalCliques % 1000 == 1) {
+                                    count1000s++; 
+                                    cout &lt;&lt; count1000s &lt;&lt; "000 cliques found" &lt;&lt; endl;
+                                }
+                                    
+                                maxCliqueSize = max(maxCliqueSize, (int)C.size());
+                            }
+                            return;
+                        }
+                
+                        int v = vertexOrder[i];
+                        bool isClique = true;
+                
+                        // Step 2 & 3: Compute T[y] and S[y]
+                        for (int u : C) {
+                            if (adjList[u].find(v) == adjList[u].end()) {
+                                isClique = false;
+                                break;
+                            }
+                        }
+                
+                        if (isClique) {
+                            C.insert(v);
+                            update(i + 1, C);
+                            C.erase(v);
+                        }
+                
+                        // Step 6
+                        update(i + 1, C);
+                    }
+                
+                    void printResults() {
+                        cout &lt;&lt; "Number of maximal cliques of each size:" &lt;&lt; endl;
+                        for (auto &[size, count] : cliqueSizeCount) {
+                            cout &lt;&lt; "Size " &lt;&lt; size &lt;&lt; ": " &lt;&lt; count &lt;&lt; endl;
+                        }
+                        cout &lt;&lt; "Total number of maximal cliques: " &lt;&lt; totalCliques &lt;&lt; endl;
+                        cout &lt;&lt; "Size of the largest maximal clique: " &lt;&lt; maxCliqueSize &lt;&lt; endl;
+                    }
+                };
+                
+                int main(int argc, char *argv[]) {
+                    if (argc &lt; 2) {
+                        cerr &lt;&lt; "Usage: " &lt;&lt; argv[0] &lt;&lt; " &lt;input_file&gt;" &lt;&lt; endl;
+                        return 1;
+                    }
+                
+                    ifstream inputFile(argv[1]);
+                    if (!inputFile.is_open()) {
+                        cerr &lt;&lt; "Error: Unable to open input file!" &lt;&lt; endl;
+                        return 1;
+                    }
+                
+                    int n, m;
+                    inputFile &gt;&gt; n &gt;&gt; m;
+                
+                    CliqueFinder finder(n);
+                
+                    int u, v;
+                    for (int i = 0; i &lt; m; i++) {
+                        inputFile &gt;&gt; u &gt;&gt; v;
+                        finder.addEdge(u, v);
+                    }
+                
+                    inputFile.close();
+                
+                    auto start = chrono::high_resolution_clock::now();
+                    finder.findCliques();
+                    auto end = chrono::high_resolution_clock::now();
+                    chrono::duration&lt;double&gt; elapsed = end - start;
+                
+                    finder.printResults();
+                    cout &lt;&lt; "Running time: " &lt;&lt; elapsed.count() &lt;&lt; " seconds" &lt;&lt; endl;
+                
+                    return 0;
                 }
-                if (isAdjacentToAll) return false;
-            }
-        }
-        return true;
-    }
-
-    void findCliques() {
-        sortVerticesByDegree();
-        vector&lt;int&gt; C;
-        #pragma omp parallel
-        {
-            #pragma omp single
-            {
-                update(0, C);
-            }
-        }
-    }
-
-    void update(int i, vector&lt;int&gt; &amp;C) {
-        if (i == n) {
-            if (!C.empty() &amp;&amp; isMaximalClique(C)) {
-                #pragma omp critical
-                {
-                    cliqueSizeCount[C.size()]++;
-                    totalCliques++;
-                    maxCliqueSize = max(maxCliqueSize, (int)C.size());
-                }
-            }
-            return;
-        }
-
-        int v = vertexOrder[i];
-        bool isClique = true;
-
-        for (int u : C) {
-            if (adjList[u].find(v) == adjList[u].end()) {
-                isClique = false;
-                break;
-            }
-        }
-
-        if (isClique) {
-            C.push_back(v);
-            inClique[v] = true;
-
-            #pragma omp task shared(C)
-            update(i + 1, C);
-
-            inClique[v] = false;
-            C.pop_back();
-        }
-
-        #pragma omp task shared(C)
-        update(i + 1, C);
-    }
-
-    void printResults() {
-        cout &lt;&lt; "Number of maximal cliques of each size:" &lt;&lt; endl;
-        for (auto &amp;[size, count] : cliqueSizeCount) {
-            cout &lt;&lt; "Size " &lt;&lt; size &lt;&lt; ": " &lt;&lt; count &lt;&lt; endl;
-        }
-        cout &lt;&lt; "Total number of maximal cliques: " &lt;&lt; totalCliques &lt;&lt; endl;
-        cout &lt;&lt; "Size of the largest maximal clique: " &lt;&lt; maxCliqueSize &lt;&lt; endl;
-    }
-};
-
-int main() {
-    ifstream inputFile("test4_processed.txt");
-    if (!inputFile.is_open()) {
-        cerr &lt;&lt; "Error: Unable to open input file!" &lt;&lt; endl;
-        return 1;
-    }
-
-    int n, m;
-    inputFile &gt;&gt; n &gt;&gt; m;
-
-    CliqueFinder finder(n);
-
-    int u, v;
-    for (int i = 0; i &lt; m; i++) {
-        inputFile &gt;&gt; u &gt;&gt; v;
-        finder.addEdge(u, v);
-    }
-
-    inputFile.close();
-
-    auto start = chrono::high_resolution_clock::now();
-    finder.findCliques();
-    auto end = chrono::high_resolution_clock::now();
-    chrono::duration&lt;double&gt; elapsed = end - start;
-
-    finder.printResults();
-    cout &lt;&lt; "Running time: " &lt;&lt; elapsed.count() &lt;&lt; " seconds" &lt;&lt; endl;
-
-    return 0;
-}</code></pre>
-        </div>
+                </code></pre>
+            </div>
 
         <div class="histogram-section">
             <h2>Execution Times</h2>

@@ -33,12 +33,12 @@
                         <td>459002</td>
                     </tr>
                     <tr>
-                        <td>Execution time with Parallelization</td>
-                        <td>0.515 seconds</td>
+                        <td>Execution time without Parallelization</td>
+                        <td>3.847 sec</td>
                     </tr>
                     <tr>
-                        <td>Execution time without Parallelization</td>
-                        <td>10.504 seconds</td>
+                        <td>Execution time with Parallelization</td>
+                        <td>0.515 sec</td>
                     </tr>
                 </table>
             </br>
@@ -62,12 +62,12 @@
                         <td>226859</td>
                     </tr>
                     <tr>
-                        <td>Execution time with Parallelization</td>
-                        <td>1.666 seconds</td>
+                        <td>Execution time without Parallelization</td>
+                        <td>13.79 sec</td>
                     </tr>
                     <tr>
-                        <td>Execution time without Parallelization</td>
-                        <td>53.263 seconds</td>
+                        <td>Execution time with Parallelization</td>
+                        <td>1.667 sec</td>
                     </tr>
                 </table>
             </div>
@@ -89,12 +89,12 @@
                         <td>37322355</td>
                     </tr>
                     <tr>
-                        <td>Execution time with Parallelization</td>
-                        <td>4674.17 seconds</td>
+                        <td>Execution time without Parallelization</td>
+                        <td>64769.5 s ~ 17.99 hrs</td>
                     </tr>
                     <tr>
-                        <td>Execution time without Parallelization</td>
-                        <td>More than 12 Hours</td>
+                        <td>Execution time with Parallelization</td>
+                        <td>4674.17 sec ~ 77.9 mins</td>
                     </tr>
                 </table>
             </div>
@@ -103,10 +103,17 @@
 
         <!-- Source Code Section -->
         <div class="source-code">
-            <h2>Source Code</h2>
+            <h2>Source Code (Non-Parallelized)</h2>
             <pre><code>
+                //*
+                Compilation : g++ -O2 Tomita_Cliques_No_Parallelization.cpp -o tomita
+                Execution   : tomita &lt;dataset_filename.txt&gt;
+                *//
+                
+                // THIS CODE DOES NOT INCORPORATE PARALLEL PROGRAMMING USING OpenMP, OMP LINES HAVE BEEN COMMENTED
+                
                 #include &lt;bits/stdc++.h&gt;
-                #include &lt;omp.h&gt;
+                // #include &lt;omp.h&gt;
                 #include &lt;chrono&gt;
                 using namespace std;
                 using namespace std::chrono; // for measuring execution times
@@ -118,8 +125,8 @@
                 
                 // EXPAND: Choose a vertex 'u' from (CAND ∪ FINI) that maximizes the number of neighbors in CAND.
                 int EXPAND(const unordered_set&lt;int&gt;&amp; CAND, const unordered_set&lt;int&gt;&amp; FINI, const vector&lt;unordered_set&lt;int&gt;&gt;&amp; SUBG) {
-                    int bestVertex = -1, bestCount = -1;
-                    unordered_set&lt;int&gt; UNION = CAND;
+                    int bestVertex = -1, bestCount = -1; // bestCount stores the maximum number of neighbors for a vertex  
+                    unordered_set&lt;int&gt; UNION = CAND; // UNION = CAND ∪ FINI
                     UNION.insert(FINI.begin(), FINI.end());
                     for (int u : UNION) {
                         int count = 0;
@@ -134,23 +141,29 @@
                     return bestVertex;
                 }
                 
-                // CLIQUES: Recursive procedure to implement the Tomita Algorithm.
+                // CLIQUES: Recursive procedure to be implemented in the Tomita Paper.
                 void CLIQUES(vector&lt;int&gt;&amp; clique, unordered_set&lt;int&gt;&amp; CAND, unordered_set&lt;int&gt;&amp; FINI, const vector&lt;unordered_set&lt;int&gt;&gt;&amp; SUBG) {
+                    // if CAND and FINI are empty, clique is maximal
                     if (CAND.empty() &amp;&amp; FINI.empty()) {
                         int size = clique.size();
-                        #pragma omp critical
+                        // #pragma omp critical 
                         {
                             globalCliqueSizes.push_back(size);
                             globalTotalCliques++;
-                            sizeDist[size]++;
+                            sizeDist[size]++; // For the histogram, avoids another entire iteration over the clique sizes for histogram 
+                            // Debug statement to check how many cliques have been found currently
+                            
                             if(globalTotalCliques % 100000 == 1){
                                 cout &lt;&lt; globalTotalCliques - 1 &lt;&lt; " Maximal Cliques found. " &lt;&lt; endl; 
                             }
+                            
                             globalMaxCliqueSize = max(globalMaxCliqueSize, size);
                         }
                         return;
                     }
+                    // Choose pivot vertex 'u' from (CAND ∪ FINI) that maximizes the number of neighbors in CAND.
                     int pivot = EXPAND(CAND, FINI, SUBG);
+                    // ext = CAND - N(u) (Difference Set)
                     unordered_set&lt;int&gt; ext;
                     for (int v : CAND) {
                         if (!SUBG[pivot].count(v))
@@ -160,24 +173,34 @@
                     vector&lt;int&gt; extCopy(ext.begin(), ext.end());
                     for (int v : extCopy) {
                         clique.push_back(v);
+                        // Build new candidate set: CANDq = CAND ∩ N(v)
                         unordered_set&lt;int&gt; CANDq;
                         for (int w : CAND) {
                             if (SUBG[v].count(w))
                                 CANDq.insert(w);
                         }
+                        
+                        // Build new finished set: FINIq = FINI ∩ N(v)
                         unordered_set&lt;int&gt; FINIq;
                         for (int w : FINI) {
                             if (SUBG[v].count(w))
                                 FINIq.insert(w);
                         }
+                        
+                        // Recursion step with clique, CANDq, FINIq
                         CLIQUES(clique, CANDq, FINIq, SUBG);
+                        
+                        // backtracking step for when adding a new vertex does not satisfy maximal property
                         clique.pop_back();
+                
+                        // remove 'v' from CAND
                         CAND.erase(v);
+                        // add 'v' to FINI since the vertex has been EXPANDed
                         FINI.insert(v);
                     }
                 }
                 
-                // Main function: Takes an input file, loads the graph, and parallelizes the CLIQUES function.
+                // main: Takes the input.txt file, loads the graph and performs CLIQUES for each vertex.
                 int main(int argc, char* argv[]){
                     if(argc != 2){
                         cerr &lt;&lt; "Please input in the format : &lt;executable_name&gt; &lt;dataset_filename&gt;" &lt;&lt; endl;
@@ -188,41 +211,56 @@
                         cerr &lt;&lt; "Error: Could not open file " &lt;&lt; argv[1] &lt;&lt; endl;
                         return 1;
                     }
-                    
+                
+                    // start the execution time before loading the dataset into a graph
                     auto start_time = high_resolution_clock::now();
+                
+                    // number of vertices = n, number of edges = m (first two lines of the input file)
                     int n, m;
                     infile &gt;&gt; n &gt;&gt; m;
-                    vector&lt;unordered_set&lt;int&gt;&gt; graph(n);
-                    int u, v;
+                    vector&lt;unordered_set&lt;int&gt;&gt; graph(n); // stores the graph as an adjacency list
+                    int u, v; // u - start vertex, v - end vertex
                     for (int i = 0; i &lt; m; i++){
                          infile &gt;&gt; u &gt;&gt; v;
-                         if(u &gt;= 0 &amp;&amp; u &lt; n &amp;&amp; v &gt;= 0 &amp;&amp; v &lt; n &amp;&amp; u != v){
+                         // Assume vertices are 0-based and 0 &lt;= u,v &lt; n.
+                         if(u &lt; 0 || u &gt;= n || v &lt; 0 || v &gt;= n) continue;
+                         if(u != v){
+                             // ensuring an undirected graph by entering both u-&gt;v and v-&gt;u
                              graph[u].insert(v);
                              graph[v].insert(u);
                          }
                     }
                     infile.close();
-                    cout &lt;&lt; "Graph loaded with " &lt;&lt; n &lt;&lt; " nodes and " &lt;&lt; m &lt;&lt; " edges." &lt;&lt; endl;
-                
-                    #pragma omp parallel for schedule(dynamic)
+                    // Debug statement to check if the graph has been loaded correctly
+                    cout &lt;&lt; "graph loaded with " &lt;&lt; n &lt;&lt; " nodes and " &lt;&lt; m &lt;&lt; " edges." &lt;&lt; endl;
+                        
+                    // Parallelize the outer loop so that each vertex i is processed in parallel.
+                    // (OMP lines are commented since this version does not use OpenMP.)
+                    // #pragma omp parallel for schedule(dynamic)
                     for (int i = 0; i &lt; n; i++){
                         unordered_set&lt;int&gt; CAND, FINI;
+                        // For vertex i, candidate set: all neighbors with index &gt; i.
                         for (int j = i + 1; j &lt; n; j++){
                             if(graph[i].count(j))
                                 CAND.insert(j);
                         }
+                        // Finished set: all neighbors with index &lt; i.
                         for (int j = 0; j &lt; i; j++){
                             if(graph[i].count(j))
                                 FINI.insert(j);
                         }
                         vector&lt;int&gt; clique;
                         clique.push_back(i);
+                        // recursively checks if the clique is maximal, if not, backtracks
                         CLIQUES(clique, CAND, FINI, graph);
                     }
                     
                     auto end_time = high_resolution_clock::now();
-                    double exec_time = duration_cast&lt;milliseconds&gt;(end_time - start_time).count()/1000.0;
                 
+                    // exec_time is measured in seconds
+                    double exec_time = duration_cast&lt;milliseconds&gt;(end_time - start_time).count()/1000.0;
+                    
+                    // Results
                     cout &lt;&lt; "\n------------Results--------------" &lt;&lt; endl;
                     cout &lt;&lt; "Total maximal cliques: " &lt;&lt; globalTotalCliques &lt;&lt; endl;
                     cout &lt;&lt; "Largest maximal clique size: " &lt;&lt; globalMaxCliqueSize &lt;&lt; endl;

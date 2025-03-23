@@ -32,12 +32,12 @@
                         <td>459002</td>
                     </tr>
                     <tr>
-                        <td>Execution time with Parallelization</td>
-                        <td>0.438522 seconds</td>
+                        <td>Execution time without Parallelization</td>
+                        <td>1.810 sec</td>
                     </tr>
                     <tr>
-                        <td>Execution time without Parallelization</td>
-                        <td>8.0867 seconds</td>
+                        <td>Execution time with Parallelization</td>
+                        <td>0.459 sec</td>
                     </tr>
                 </table>
             </br>
@@ -61,12 +61,12 @@
                         <td>226859</td>
                     </tr>
                     <tr>
-                        <td>Execution time with Parallelization</td>
-                        <td>50.5125 seconds</td>
+                        <td>Execution time without Parallelization</td>
+                        <td>7.755 sec</td>
                     </tr>
                     <tr>
-                        <td>Execution time without Parallelization</td>
-                        <td>150.329 seconds</td>
+                        <td>Execution time with Parallelization</td>
+                        <td>50.513 sec</td>
                     </tr>
                 </table>
             </div>
@@ -88,12 +88,12 @@
                         <td>37322355</td>
                     </tr>
                     <tr>
-                        <td>Execution time with Parallelization</td>
-                        <td>3351.14 seconds</td>
+                        <td>Execution time without Parallelization</td>
+                        <td>48368.6 s ~ 13.43 hrs</td>
                     </tr>
                     <tr>
-                        <td>Execution time without Parallelization</td>
-                        <td>More than 12 Hours</td>
+                        <td>Execution time with Parallelization</td>
+                    <td>3351.14 s ~ 55.9 mins</td>
                     </tr>
                 </table>
             </div>
@@ -102,224 +102,123 @@
 
         <!-- Source Code Section -->
         <div class="source-code">
-            <h2>Source Code</h2>
-<pre><code>#include &lt;bits/stdc++.h&gt;
-#include &lt;omp.h&gt;
-using namespace std;
-
-class Graph {
-private:
-    int n;
-    vector&lt;unordered_set&lt;int&gt;&gt; adj; // Adjacency list for O(1) lookup
-public:
-    Graph(int n) : n(n), adj(n) {} // Constructor
-    void addEdge(int u, int v) { // Add both directions to make input graph undirected
-        adj[u].insert(v);
-        adj[v].insert(u);
-    }
-    vector&lt;int&gt; degeneracy() const { // Compute degeneracy ordering of vertices in O(n+m)
-        vector&lt;int&gt; ordering;
-        vector&lt;unordered_set&lt;int&gt;&gt; rem = adj; // copy operation once
-        vector&lt;bool&gt; done(n, false);
-        for (int i = 0 ; i &lt; n ; i++) {
-            int min_deg = INT_MAX;
-            int min_ver = -1;
-            for (int v = 0 ; v &lt; n ; v++) {
-                if ((rem[v].size() &lt; min_deg) &amp;&amp; !done[v]) {
-                    min_deg = rem[v].size();
-                    min_ver = v;
-                }
-            }
-            ordering.push_back(min_ver);
-            done[min_ver] = true;
-            for (int near : rem[min_ver]) { // Remove the added vertex from its neighbors' adj sets
-                if (!done[near]) {
-                    rem[near].erase(min_ver);
-                }
-            }
-        }
-        reverse(ordering.begin(), ordering.end()); // Above construction is reversed so put it back in order
-        return ordering;
-    }
-    const unordered_set&lt;int&gt;&amp; get_neigh(int v) const { return adj[v]; } // Returns neighbors of a vertex.
-    int size() const { return n; } // Returns size of graph
-};
-
-class BronKerbosch_Cliquer {
-private:
-    const Graph &amp;graph;
-    vector&lt;int&gt; ordering;
-    // Global variables to store req results
-    int totalCliques = 0;
-    int maxCliqueSize = 0;
-    map&lt;int, int&gt; cliqueSizes; // Map with key as clique size and value as count for O(n)
-    // In-place recursive BronKerbosch with pivoting: P and X are candidate vertex sets, R is the current clique being constructed
-    // Local counter variables (loc_tot_cliques, loc_max_size, loc_size_dist) passed by reference so the recursion calls add results into caller's TLS
-    void BronKerboschDegeneracy(vector&lt;int&gt; &amp;R, vector&lt;int&gt; &amp;P, vector&lt;int&gt; &amp;X, int &amp;loc_tot_cliques, int &amp;loc_max_size, map&lt;int,int&gt; &amp;loc_size_dist) const {
-        if (P.empty() &amp;&amp; X.empty()) {
-            int curr_size = R.size();
-            loc_tot_cliques++;
-            loc_max_size = max(loc_max_size, curr_size);
-            loc_size_dist[curr_size]++;
-            return;
-        }
-        // Choose pivot u from (P ∪ X) that maximizes no of elements in (P ∩ N(u))
-        int pivot = -1, max_ele = -1;
-        for (int u : P) {
-            int c = 0;
-            const auto &amp;neigh = graph.get_neigh(u);
-            for (int w : P) {
-                if (neigh.find(w) != neigh.end()) {
-                    c++;
-                }
-            }
-            if (c &gt; max_ele) {
-                pivot = u;
-                max_ele = c;
-            }
-        }
-        for (int u : X) {
-            int c = 0;
-            const auto &amp;neigh = graph.get_neigh(u);
-            for (int w : P) {
-                if (neigh.find(w) != neigh.end()) {
-                    c++;
-                }
-            }
-            if (c &gt; max_ele) {
-                pivot = u;
-                max_ele = c;
-            }
-        }
-        const auto &amp;piv_neigh = graph.get_neigh(pivot);
-        // Process candidates (vertices in P that aren't neighbors of pivot)
-        int i = 0;
-        while (i &lt; (int)P.size()) { 
-            int v = P[i];
-            if (piv_neigh.find(v) != piv_neigh.end()) { 
-                i++; // Ensure we move forward
-                continue;
-            }        
-            // Find new candidate set for v
-            const auto &amp;v_neigh = graph.get_neigh(v);
-            vector&lt;int&gt; P_new;
-            P_new.reserve(P.size());
-            for (int w : P) {
-                if (v_neigh.find(w) != v_neigh.end()) {
-                    P_new.push_back(w);
-                }
-            }
-            vector&lt;int&gt; X_new;
-            X_new.reserve(X.size());
-            for (int w : X) {
-                if (v_neigh.find(w) != v_neigh.end())
-                    X_new.push_back(w);
-            }
-            R.push_back(v);
-            BronKerboschDegeneracy(R, P_new, X_new, loc_tot_cliques, loc_max_size, loc_size_dist);
-            R.pop_back();
-            P[i] = P.back(); // Swap last ele with v
-            P.pop_back(); // Remove v
-            X.push_back(v); // Add v to X
-            // No need to increment i as P[i] now has a new element.
-        }
-    }
-public:
-    BronKerbosch_Cliquer(const Graph &amp;g) : graph(g) {
-        ordering = graph.degeneracy();
-    }
-    void count_max_cliques() {
-        int n = graph.size();
-        // Global variables from TLS
-        int glo_tot_cliques = 0;
-        int glo_max_size = 0;
-        map&lt;int,int&gt; glo_size_dist;
-        // Parallelize outer loop using OpenMP
-        #pragma omp parallel
-        {
-            int loc_tot_cliques = 0;
-            int loc_max_size = 0;
-            map&lt;int,int&gt; loc_size_dist;
-            // Outer loop: each vertex (in degeneracy order) processed independently
-            #pragma omp for schedule(dynamic)
-            for (int i = 0 ; i &lt; n ; i++) {
-                int v = ordering[i];
-                const auto &amp;neigh = graph.get_neigh(v);
-                // Candidate set P - later neighbors in degeneracy ordering
-                vector&lt;int&gt; P;
-                for (int j = i + 1 ; j &lt; n ; j++) {
-                    int later_v = ordering[j];
-                    if (neigh.find(later_v) != neigh.end()) {
-                        P.push_back(later_v);
+            <h2>Source Code (Non-Parallelized)</h2>
+            <pre><code>
+                #include &lt;bits/stdc++.h&gt;
+                using namespace std;
+                struct Graph {
+                    int n;
+                    vector&lt;unordered_set&lt;int&gt;&gt; adj; // Adjacency list for O(1) lookup
+                    Graph(int n) : n(n), adj(n) {}  // Constructor
+                    void addEdge(int u, int v) {
+                        adj[u].insert(v);
+                        adj[v].insert(u);
                     }
-                }
-                // Excluded set X - earlier neighbors in degeneracy ordering.
-                vector&lt;int&gt; X;
-                for (int j = 0 ; j &lt; i ; j++) {
-                    int earlier_v = ordering[j];
-                    if (neigh.find(earlier_v) != neigh.end()) {
-                        X.push_back(earlier_v);
+                    vector&lt;int&gt; degeneracy() const { // Compute degeneracy ordering of vertices in O(n+m)
+                        vector&lt;int&gt; ordering;
+                        vector&lt;unordered_set&lt;int&gt;&gt; rem = adj; // copy operation once
+                        vector&lt;bool&gt; done(n, false);
+                        for (int i = 0; i &lt; n; i++) {
+                            int min_deg = INT_MAX, min_ver = -1;
+                            for (int v = 0; v &lt; n; v++) {
+                                if ((rem[v].size() &lt; min_deg) &amp;&amp; !done[v]) {
+                                    min_deg = rem[v].size();
+                                    min_ver = v;
+                                }
+                            }
+                            ordering.push_back(min_ver);
+                            done[min_ver] = true;
+                            for (int near : rem[min_ver]) { // Remove the added vertex from its neighbors' adj sets
+                                if (!done[near]) {
+                                    rem[near].erase(min_ver);
+                                }
+                            }
+                        }
+                        reverse(ordering.begin(), ordering.end()); // Above construction is reversed so put it back in order
+                        return ordering;
                     }
-                }
-                vector&lt;int&gt; R;
-                R.push_back(v);
-                BronKerboschDegeneracy(R, P, X, loc_tot_cliques, loc_max_size, loc_size_dist);
-            }
-            // Combine thread results into global
-            #pragma omp critical 
-            {
-                glo_tot_cliques += loc_tot_cliques;
-                glo_max_size = max(glo_max_size, loc_max_size);
-                for (auto &amp;entry : loc_size_dist) {
-                    glo_size_dist[entry.first] += entry.second;
-                }
-            }
-        }
-        // Save global results
-        totalCliques = glo_tot_cliques;
-        maxCliqueSize = glo_max_size;
-        cliqueSizes = glo_size_dist;
-    }
-    int get_max_size() const {return maxCliqueSize;}
-    int get_tot_cliques() const {return totalCliques;}
-    const map&lt;int, int&gt;&amp; get_size_dist() const {return cliqueSizes;}
-};
-
-int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        cerr &lt;&lt; "Please use './executable_name input.txt' for executing" &lt;&lt; endl;
-        return 1;
-    }
-    ifstream inputFile(argv[1]);
-    if (!inputFile) {
-        cerr &lt;&lt; "Could not open file " &lt;&lt; endl;
-        return 1;
-    }
-    int n, m;
-    inputFile &gt;&gt; n &gt;&gt; m;
-    Graph graph(n);
-    for (int i = 0 ; i &lt; m ; ++i) {
-        int u, v;
-        inputFile &gt;&gt; u &gt;&gt; v;
-        if (u &lt; 0 || u &gt;= n || v &lt; 0 || v &gt;= n) {
-            continue;
-        }
-        graph.addEdge(u, v);
-    }
-    BronKerbosch_Cliquer counter(graph);
-    auto start = chrono::high_resolution_clock::now();
-    counter.count_max_cliques();
-    auto end = chrono::high_resolution_clock::now();
-    chrono::duration&lt;double&gt; elapsed = end - start;
-    cout &lt;&lt; "1. Largest clique size: " &lt;&lt; counter.get_max_size() &lt;&lt; endl;
-    cout &lt;&lt; "2. Total no of maximal cliques: " &lt;&lt; counter.get_tot_cliques() &lt;&lt; endl;
-    cout &lt;&lt; "3. Execution time: " &lt;&lt; elapsed.count() &lt;&lt; " seconds" &lt;&lt; endl;
-    cout &lt;&lt; "4. Distribution of clique sizes:" &lt;&lt; endl;
-    for (auto it = counter.get_size_dist().begin() ; it != counter.get_size_dist().end() ; ++it) {
-        cout &lt;&lt; "  Size " &lt;&lt; it-&gt;first &lt;&lt; ": " &lt;&lt; it-&gt;second &lt;&lt; " cliques" &lt;&lt; endl;
-    }
-    return 0;
-}</code></pre>
+                    const unordered_set&lt;int&gt;&amp; get_neigh(int v) const { return adj[v]; } // Returns neighbors of a vertex.
+                    int size() const { return n; } // Returns size of graph
+                };
+                
+                struct BronKerbosch_Cliquer {
+                    const Graph &amp;graph;
+                    vector&lt;int&gt; ordering;
+                    int totalCliques = 0, maxCliqueSize = 0;
+                    map&lt;int, int&gt; cliqueSizes;
+                    BronKerbosch_Cliquer(const Graph &amp;g) : graph(g) {
+                        ordering = graph.degeneracy();
+                    }
+                    void BronKerboschDegeneracy(vector&lt;int&gt; &amp;R, vector&lt;int&gt; &amp;P, vector&lt;int&gt; &amp;X) {
+                        if (P.empty() &amp;&amp; X.empty()) {
+                            int curr_size = R.size();
+                            totalCliques++;
+                            maxCliqueSize = max(maxCliqueSize, curr_size);
+                            cliqueSizes[curr_size]++;
+                            return;
+                        }
+                        int pivot = -1, max_ele = -1;
+                        for (int u : P) {
+                            int c = 0;
+                            const auto &amp;neigh = graph.get_neigh(u);
+                            for (int w : P)
+                                if (neigh.find(w) != neigh.end()) c++;
+                            if (c &gt; max_ele) {
+                                pivot = u;
+                                max_ele = c;
+                            }
+                        }
+                        for (int u : X) {
+                            int c = 0;
+                            const auto &amp;neigh = graph.get_neigh(u);
+                            for (int w : P)
+                                if (neigh.find(w) != neigh.end()) c++;
+                            if (c &gt; max_ele) {
+                                pivot = u;
+                                max_ele = c;
+                            }
+                        }
+                        const auto &amp;piv_neigh = graph.get_neigh(pivot);
+                        int i = 0;
+                        while (i &lt; (int)P.size()) {
+                            int v = P[i];
+                            if (piv_neigh.find(v) != piv_neigh.end()) {
+                                i++;
+                                continue;
+                            }
+                            const auto &amp;v_neigh = graph.get_neigh(v);
+                            vector&lt;int&gt; P_new, X_new;
+                            for (int w : P)
+                                if (v_neigh.find(w) != v_neigh.end()) P_new.push_back(w);
+                            for (int w : X)
+                                if (v_neigh.find(w) != v_neigh.end()) X_new.push_back(w);
+                            R.push_back(v);
+                            BronKerboschDegeneracy(R, P_new, X_new);
+                            R.pop_back();
+                            P[i] = P.back();
+                            P.pop_back();
+                            X.push_back(v);
+                        }
+                    }
+                    void count_max_cliques() {
+                        int n = graph.size();
+                        for (int i = 0; i &lt; n; i++) {
+                            int v = ordering[i];
+                            const auto &amp;neigh = graph.get_neigh(v);
+                            vector&lt;int&gt; P, X;
+                            for (int j = i + 1; j &lt; n; j++)
+                                if (neigh.find(ordering[j]) != neigh.end()) P.push_back(ordering[j]);
+                            for (int j = 0; j &lt; i; j++)
+                                if (neigh.find(ordering[j]) != neigh.end()) X.push_back(ordering[j]);
+                            vector&lt;int&gt; R = {v};
+                            BronKerboschDegeneracy(R, P, X);
+                        }
+                    }
+                    int get_max_size() const { return maxCliqueSize; }
+                    int get_tot_cliques() const { return totalCliques; }
+                    const map&lt;int, int&gt;&amp; get_size_dist() const { return cliqueSizes; }
+                };
+                </code></pre>                
         </div>
 
         <div class="histogram-section">
