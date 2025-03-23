@@ -104,6 +104,12 @@
         <div class="source-code">
             <h2>Source Code (Non-Parallelized)</h2>
             <pre><code>
+                /*
+                Open the BronKerboschDegeneracy.cpp file and execute using the directive:
+                    g++ -O3 -std=c++17 BronKerboschDegeneracy.cpp -o bronkerbosch
+                For executing (choose from wiki.txt, enron.txt, skitter.txt to replace input_file.txt):
+                    ./bronkerbosch input_file.txt
+                */
                 #include &lt;bits/stdc++.h&gt;
                 using namespace std;
                 struct Graph {
@@ -116,7 +122,7 @@
                     }
                     vector&lt;int&gt; degeneracy() const { // Compute degeneracy ordering of vertices in O(n+m)
                         vector&lt;int&gt; ordering;
-                        vector&lt;unordered_set&lt;int&gt;&gt; rem = adj; // copy operation once
+                        vector&lt;unordered_set&lt;int&gt;&gt; rem = adj; // Copy operation once
                         vector&lt;bool&gt; done(n, false);
                         for (int i = 0; i &lt; n; i++) {
                             int min_deg = INT_MAX, min_ver = -1;
@@ -128,17 +134,17 @@
                             }
                             ordering.push_back(min_ver);
                             done[min_ver] = true;
-                            for (int near : rem[min_ver]) { // Remove the added vertex from its neighbors' adj sets
+                            for (int near : rem[min_ver]) {
                                 if (!done[near]) {
                                     rem[near].erase(min_ver);
                                 }
                             }
                         }
-                        reverse(ordering.begin(), ordering.end()); // Above construction is reversed so put it back in order
+                        reverse(ordering.begin(), ordering.end());
                         return ordering;
                     }
-                    const unordered_set&lt;int&gt;&amp; get_neigh(int v) const { return adj[v]; } // Returns neighbors of a vertex.
-                    int size() const { return n; } // Returns size of graph
+                    const unordered_set&lt;int&gt;&amp; get_neigh(int v) const { return adj[v]; }
+                    int size() const { return n; }
                 };
                 
                 struct BronKerbosch_Cliquer {
@@ -159,16 +165,6 @@
                         }
                         int pivot = -1, max_ele = -1;
                         for (int u : P) {
-                            int c = 0;
-                            const auto &amp;neigh = graph.get_neigh(u);
-                            for (int w : P)
-                                if (neigh.find(w) != neigh.end()) c++;
-                            if (c &gt; max_ele) {
-                                pivot = u;
-                                max_ele = c;
-                            }
-                        }
-                        for (int u : X) {
                             int c = 0;
                             const auto &amp;neigh = graph.get_neigh(u);
                             for (int w : P)
@@ -214,11 +210,31 @@
                             BronKerboschDegeneracy(R, P, X);
                         }
                     }
-                    int get_max_size() const { return maxCliqueSize; }
-                    int get_tot_cliques() const { return totalCliques; }
-                    const map&lt;int, int&gt;&amp; get_size_dist() const { return cliqueSizes; }
                 };
-                </code></pre>                
+                
+                int main(int argc, char* argv[]) {
+                    if (argc != 2) {
+                        cerr &lt;&lt; "Please use './executable_name input.txt' for executing" &lt;&lt; endl;
+                        return 1;
+                    }
+                    ifstream inputFile(argv[1]);
+                    if (!inputFile) {
+                        cerr &lt;&lt; "Could not open file" &lt;&lt; endl;
+                        return 1;
+                    }
+                    int n, m;
+                    inputFile &gt;&gt; n &gt;&gt; m;
+                    Graph graph(n);
+                    for (int i = 0; i &lt; m; ++i) {
+                        int u, v;
+                        inputFile &gt;&gt; u &gt;&gt; v;
+                        graph.addEdge(u, v);
+                    }
+                    BronKerbosch_Cliquer counter(graph);
+                    counter.count_max_cliques();
+                    return 0;
+                }
+            </code></pre>                
         </div>
 
         <div class="back-button">
