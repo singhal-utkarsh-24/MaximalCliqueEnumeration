@@ -104,167 +104,135 @@
         <!-- Source Code Section -->
         <div class="source-code">
             <h2>Source Code</h2>
-<pre><code>#include &lt;bits/stdc++.h&gt;
-#include &lt;omp.h&gt;
-#include &lt;chrono&gt;
-using namespace std;
-using namespace std::chrono;
-
-// Global result storage (updated in critical sections)
-vector&lt;int&gt; globalCliqueSizes;  // Stores sizes of all maximal cliques found
-long long globalTotalCliques = 0;
-int globalMaxCliqueSize = 0;
-
-// -----------------------------------------------------------------------------
-// Pivot selection: Choose u from (CAND ∪ FINI) that maximizes the number of neighbors in CAND.
-int choosePivot(const unordered_set&lt;int&gt;&amp; CAND, const unordered_set&lt;int&gt;&amp; FINI, const vector&lt;unordered_set&lt;int&gt;&gt;&amp; graph) {
-    int bestPivot = -1, bestCount = -1;
-    unordered_set&lt;int&gt; unionSet = CAND;
-    unionSet.insert(FINI.begin(), FINI.end());
-    for (int u : unionSet) {
-        int count = 0;
-        for (int w : CAND)
-            if (graph[u].count(w))
-                count++;
-        if (count &gt; bestCount) {
-            bestCount = count;
-            bestPivot = u;
-        }
-    }
-    return bestPivot;
-}
-
-// -----------------------------------------------------------------------------
-// Tomita Recursive Function (in-place update of CAND and FINI)
-// 
-// This implementation follows the standard recurrence:
-//   if (CAND and FINI are empty) then output clique
-//   else, choose pivot u; for each v in (CAND \ N(u)):
-//       Recurse with: Q U {v}, CAND ∩ N(v), FINI ∩ N(v)
-//       Then remove v from CAND and add it to FINI
-// This prevents overcounting of maximal cliques.
-void tomitaClique(vector&lt;int&gt;&amp; clique, unordered_set&lt;int&gt;&amp; CAND, unordered_set&lt;int&gt;&amp; FINI, const vector&lt;unordered_set&lt;int&gt;&gt;&amp; graph) {
-    if (CAND.empty() &amp;&amp; FINI.empty()) {
-        int size = clique.size();
-        #pragma omp critical
-        {
-            globalCliqueSizes.push_back(size);
-            globalTotalCliques++;
-            globalMaxCliqueSize = max(globalMaxCliqueSize, size);
-        }
-        return;
-    }
-    
-    int pivot = choosePivot(CAND, FINI, graph);
-    // ext = CAND \ N(pivot)
-    unordered_set&lt;int&gt; ext;
-    for (int v : CAND) {
-        if (!graph[pivot].count(v))
-            ext.insert(v);
-    }
-    
-    // Iterate over a copy of ext since we'll modify CAND during the loop.
-    vector&lt;int&gt; extVec(ext.begin(), ext.end());
-    for (int v : extVec) {
-        clique.push_back(v);
-        
-        // Build new candidate set: newCAND = CAND ∩ N(v)
-        unordered_set&lt;int&gt; newCAND;
-        for (int w : CAND) {
-            if (graph[v].count(w))
-                newCAND.insert(w);
-        }
-        
-        // Build new finished set: newFINI = FINI ∩ N(v)
-        unordered_set&lt;int&gt; newFINI;
-        for (int w : FINI) {
-            if (graph[v].count(w))
-                newFINI.insert(w);
-        }
-        
-        // Recurse with the new sets.
-        tomitaClique(clique, newCAND, newFINI, graph);
-        
-        clique.pop_back();
-        // Remove v from CAND and add it to FINI to avoid duplicates.
-        CAND.erase(v);
-        FINI.insert(v);
-    }
-}
-
-// -----------------------------------------------------------------------------
-// Main Function
-//
-// Reads the input file (with format described above). The outer loop (over vertices)
-// is parallelized with OpenMP. For each vertex i, we build its candidate set (neighbors with index &gt; i)
-// and finished set (neighbors with index &lt; i), then call the recursive routine.
-int main(int argc, char* argv[]){
-    if(argc != 2){
-         cerr &lt;&lt; "Usage: &lt;executable&gt; &lt;input_file&gt;" &lt;&lt; endl;
-         return 1;
-    }
-    ifstream infile(argv[1]);
-    if(!infile){
-         cerr &lt;&lt; "Error: Could not open file " &lt;&lt; argv[1] &lt;&lt; endl;
-         return 1;
-    }
-    
-    int n, m;
-    infile &gt;&gt; n &gt;&gt; m;
-    vector&lt;unordered_set&lt;int&gt;&gt; graph(n);
-    int u, v;
-    for (int i = 0; i &lt; m; i++){
-         infile &gt;&gt; u &gt;&gt; v;
-         // Assume vertices are 0-based and 0 &lt;= u,v &lt; n.
-         if(u &lt; 0 || u &gt;= n || v &lt; 0 || v &gt;= n) continue;
-         if(u != v){
-             graph[u].insert(v);
-             graph[v].insert(u);
-         }
-    }
-    infile.close();
-    cout &lt;&lt; "Graph loaded with " &lt;&lt; n &lt;&lt; " nodes and " &lt;&lt; m &lt;&lt; " edges." &lt;&lt; endl;
-    
-    auto start_time = high_resolution_clock::now();
-    
-    // Parallelize the outer loop so that each vertex i is processed in parallel.
-    #pragma omp parallel for schedule(dynamic)
-    for (int i = 0; i &lt; n; i++){
-         unordered_set&lt;int&gt; CAND, FINI;
-         // For vertex i, candidate set: all neighbors with index &gt; i.
-         for (int j = i + 1; j &lt; n; j++){
-              if (graph[i].count(j))
-                   CAND.insert(j);
-         }
-         // Finished set: all neighbors with index &lt; i.
-         for (int j = 0; j &lt; i; j++){
-              if (graph[i].count(j))
-                   FINI.insert(j);
-         }
-         vector&lt;int&gt; clique;
-         clique.push_back(i);
-         tomitaClique(clique, CAND, FINI, graph);
-    }
-    
-    auto end_time = high_resolution_clock::now();
-    double exec_time = duration_cast&lt;milliseconds&gt;(end_time - start_time).count()/1000.0;
-    
-    // Compute frequency distribution of clique sizes.
-    map&lt;int, int&gt; sizeDist;
-    for (int size : globalCliqueSizes)
-         sizeDist[size]++;
-    
-    // Output results.
-    cout &lt;&lt; "\n=== Results ===" &lt;&lt; endl;
-    cout &lt;&lt; "Total maximal cliques: " &lt;&lt; globalTotalCliques &lt;&lt; endl;
-    cout &lt;&lt; "Largest maximal clique size: " &lt;&lt; globalMaxCliqueSize &lt;&lt; endl;
-    cout &lt;&lt; "Execution time: " &lt;&lt; exec_time &lt;&lt; " seconds" &lt;&lt; endl;
-    cout &lt;&lt; "Distribution of maximal clique sizes:" &lt;&lt; endl;
-    for (auto &amp;p : sizeDist)
-         cout &lt;&lt; "  Size " &lt;&lt; p.first &lt;&lt; ": " &lt;&lt; p.second &lt;&lt; " cliques" &lt;&lt; endl;
-    
-    return 0;
-}</code></pre>
+            <pre><code>
+                #include &lt;bits/stdc++.h&gt;
+                #include &lt;omp.h&gt;
+                #include &lt;chrono&gt;
+                using namespace std;
+                using namespace std::chrono; // for measuring execution times
+                
+                vector&lt;int&gt; globalCliqueSizes;  // sizes of all maximal cliques 
+                long long globalTotalCliques = 0; // allows parallelization
+                int globalMaxCliqueSize = 0; // Largest clique size
+                map&lt;int, int&gt; sizeDist; // frequency distribution of clique sizes
+                
+                // EXPAND: Choose a vertex 'u' from (CAND ∪ FINI) that maximizes the number of neighbors in CAND.
+                int EXPAND(const unordered_set&lt;int&gt;&amp; CAND, const unordered_set&lt;int&gt;&amp; FINI, const vector&lt;unordered_set&lt;int&gt;&gt;&amp; SUBG) {
+                    int bestVertex = -1, bestCount = -1;
+                    unordered_set&lt;int&gt; UNION = CAND;
+                    UNION.insert(FINI.begin(), FINI.end());
+                    for (int u : UNION) {
+                        int count = 0;
+                        for (int w : CAND)
+                            if (SUBG[u].count(w))
+                                count++;
+                        if (count &gt; bestCount) {
+                            bestCount = count;
+                            bestVertex = u;
+                        }
+                    }
+                    return bestVertex;
+                }
+                
+                // CLIQUES: Recursive procedure to implement the Tomita Algorithm.
+                void CLIQUES(vector&lt;int&gt;&amp; clique, unordered_set&lt;int&gt;&amp; CAND, unordered_set&lt;int&gt;&amp; FINI, const vector&lt;unordered_set&lt;int&gt;&gt;&amp; SUBG) {
+                    if (CAND.empty() &amp;&amp; FINI.empty()) {
+                        int size = clique.size();
+                        #pragma omp critical
+                        {
+                            globalCliqueSizes.push_back(size);
+                            globalTotalCliques++;
+                            sizeDist[size]++;
+                            if(globalTotalCliques % 100000 == 1){
+                                cout &lt;&lt; globalTotalCliques - 1 &lt;&lt; " Maximal Cliques found. " &lt;&lt; endl; 
+                            }
+                            globalMaxCliqueSize = max(globalMaxCliqueSize, size);
+                        }
+                        return;
+                    }
+                    int pivot = EXPAND(CAND, FINI, SUBG);
+                    unordered_set&lt;int&gt; ext;
+                    for (int v : CAND) {
+                        if (!SUBG[pivot].count(v))
+                            ext.insert(v);
+                    }
+                
+                    vector&lt;int&gt; extCopy(ext.begin(), ext.end());
+                    for (int v : extCopy) {
+                        clique.push_back(v);
+                        unordered_set&lt;int&gt; CANDq;
+                        for (int w : CAND) {
+                            if (SUBG[v].count(w))
+                                CANDq.insert(w);
+                        }
+                        unordered_set&lt;int&gt; FINIq;
+                        for (int w : FINI) {
+                            if (SUBG[v].count(w))
+                                FINIq.insert(w);
+                        }
+                        CLIQUES(clique, CANDq, FINIq, SUBG);
+                        clique.pop_back();
+                        CAND.erase(v);
+                        FINI.insert(v);
+                    }
+                }
+                
+                // Main function: Takes an input file, loads the graph, and parallelizes the CLIQUES function.
+                int main(int argc, char* argv[]){
+                    if(argc != 2){
+                        cerr &lt;&lt; "Please input in the format : &lt;executable_name&gt; &lt;dataset_filename&gt;" &lt;&lt; endl;
+                        return 1;
+                    }
+                    ifstream infile(argv[1]);
+                    if(!infile){
+                        cerr &lt;&lt; "Error: Could not open file " &lt;&lt; argv[1] &lt;&lt; endl;
+                        return 1;
+                    }
+                    
+                    auto start_time = high_resolution_clock::now();
+                    int n, m;
+                    infile &gt;&gt; n &gt;&gt; m;
+                    vector&lt;unordered_set&lt;int&gt;&gt; graph(n);
+                    int u, v;
+                    for (int i = 0; i &lt; m; i++){
+                         infile &gt;&gt; u &gt;&gt; v;
+                         if(u &gt;= 0 &amp;&amp; u &lt; n &amp;&amp; v &gt;= 0 &amp;&amp; v &lt; n &amp;&amp; u != v){
+                             graph[u].insert(v);
+                             graph[v].insert(u);
+                         }
+                    }
+                    infile.close();
+                    cout &lt;&lt; "Graph loaded with " &lt;&lt; n &lt;&lt; " nodes and " &lt;&lt; m &lt;&lt; " edges." &lt;&lt; endl;
+                
+                    #pragma omp parallel for schedule(dynamic)
+                    for (int i = 0; i &lt; n; i++){
+                        unordered_set&lt;int&gt; CAND, FINI;
+                        for (int j = i + 1; j &lt; n; j++){
+                            if(graph[i].count(j))
+                                CAND.insert(j);
+                        }
+                        for (int j = 0; j &lt; i; j++){
+                            if(graph[i].count(j))
+                                FINI.insert(j);
+                        }
+                        vector&lt;int&gt; clique;
+                        clique.push_back(i);
+                        CLIQUES(clique, CAND, FINI, graph);
+                    }
+                    
+                    auto end_time = high_resolution_clock::now();
+                    double exec_time = duration_cast&lt;milliseconds&gt;(end_time - start_time).count()/1000.0;
+                
+                    cout &lt;&lt; "\n------------Results--------------" &lt;&lt; endl;
+                    cout &lt;&lt; "Total maximal cliques: " &lt;&lt; globalTotalCliques &lt;&lt; endl;
+                    cout &lt;&lt; "Largest maximal clique size: " &lt;&lt; globalMaxCliqueSize &lt;&lt; endl;
+                    cout &lt;&lt; "Execution time: " &lt;&lt; exec_time &lt;&lt; " seconds" &lt;&lt; endl;
+                    cout &lt;&lt; "Distribution of maximal clique sizes:" &lt;&lt; endl;
+                    for (auto &cli : sizeDist)
+                         cout &lt;&lt; "  Size " &lt;&lt; cli.first &lt;&lt; ": " &lt;&lt; cli.second &lt;&lt; " maximal cliques. " &lt;&lt; endl;
+                    return 0;
+                }
+                    </code></pre>
         </div>
 
         <div class="histogram-section">
