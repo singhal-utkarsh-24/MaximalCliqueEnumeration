@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maximal Clique Enumeration</title>
+  <meta name="description" content="Three maximal clique enumeration algorithms in C++, benchmarked on SNAP graphs up to 11M edges, with an interactive in-browser playground.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <p class="eyebrow">Graph algorithms · C++ · OpenMP</p>
+      <h1>Maximal Clique Enumeration</h1>
+      <p class="lede">
+        Three ways to list every maximal clique in a graph, implemented in C++ and run on real networks
+        from SNAP, up to 1.7M nodes and 11M edges. Below is a live playground running the same algorithms in your browser.
+      </p>
+      <nav class="hero-links">
+        <a class="btn primary" href="#playground">Try the playground</a>
+        <a class="btn" href="#results">See benchmarks</a>
+        <a class="btn" href="https://github.com/rushipatel296/MaximalCliqueEnumeration">Source on GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="algos" aria-label="Algorithms">
+      <article class="algo-card" style="--accent: var(--series-1)">
+        <h3><span class="swatch"></span>ELS</h3>
+        <p class="cite">Eppstein, Löffler &amp; Strash, 2010</p>
+        <p>Bron–Kerbosch with pivoting, started from each vertex in a <em>degeneracy order</em> so every subproblem stays small. Also ships as an OpenMP build.</p>
+        <a href="https://github.com/rushipatel296/MaximalCliqueEnumeration/blob/main/src/els.cpp">src/els.cpp</a>
+      </article>
+      <article class="algo-card" style="--accent: var(--series-2)">
+        <h3><span class="swatch"></span>Tomita</h3>
+        <p class="cite">Tomita, Tanaka &amp; Takahashi, 2006</p>
+        <p>Bron–Kerbosch that picks the pivot with the most neighbours among the candidates, which gives the worst-case optimal O(3<sup>n/3</sup>) bound.</p>
+        <a href="https://github.com/rushipatel296/MaximalCliqueEnumeration/blob/main/src/tomita.cpp">src/tomita.cpp</a>
+      </article>
+      <article class="algo-card" style="--accent: var(--series-3)">
+        <h3><span class="swatch"></span>Chiba</h3>
+        <p class="cite">after Chiba &amp; Nishizeki, 1985</p>
+        <p>Walks vertices in degree order and extends cliques one vertex at a time, checking maximality at the leaves. No pivot pruning, which is why it is the slowest here.</p>
+        <a href="https://github.com/rushipatel296/MaximalCliqueEnumeration/blob/main/src/chiba.cpp">src/chiba.cpp</a>
+      </article>
+    </section>
+
+    <section id="playground" class="panel">
+      <div class="section-head">
+        <h2>Playground</h2>
+        <p>A live graph you can edit. Drag nodes and the rest of the graph follows. Click one node, then another, to add or remove the edge between them.
+          Double-click empty space to add a node; select a node and press Delete to remove it. Then press <b>Run step by step</b> to watch an algorithm search for cliques.</p>
+      </div>
+
+      <div class="controls">
+        <label>Nodes <output id="nOut">16</output>
+          <input id="nIn" type="range" min="4" max="36" value="16">
+        </label>
+        <label>Edge density <output id="pOut">0.35</output>
+          <input id="pIn" type="range" min="0.05" max="0.8" step="0.05" value="0.35">
+        </label>
+        <div class="btn-row">
+          <button id="regen" class="btn primary" type="button">New random graph</button>
+          <button id="clear" class="btn" type="button">Remove all edges</button>
+          <button id="addNode" class="btn" type="button">Add node</button>
+          <button id="delNode" class="btn" type="button" disabled>Remove node</button>
+          <label class="check"><input id="physicsIn" type="checkbox" checked> Physics</label>
+        </div>
+      </div>
+
+      <div class="stepper">
+        <div class="seg" id="algoPick" role="radiogroup" aria-label="Algorithm to animate">
+          <button type="button" role="radio" data-algo="els" aria-checked="true"><span class="dot" style="background:var(--series-1)"></span>ELS</button>
+          <button type="button" role="radio" data-algo="tomita" aria-checked="false"><span class="dot" style="background:var(--series-2)"></span>Tomita</button>
+          <button type="button" role="radio" data-algo="chiba" aria-checked="false"><span class="dot" style="background:var(--series-3)"></span>Chiba</button>
+        </div>
+        <div class="btn-row">
+          <button id="animPlay" class="btn primary" type="button">Run step by step</button>
+          <button id="animStep" class="btn" type="button">Step</button>
+          <button id="animFinish" class="btn" type="button">Skip to end</button>
+          <button id="animReset" class="btn" type="button" disabled>Reset</button>
+        </div>
+        <label class="speed">Speed <output id="speedOut">4 steps/s</output>
+          <input id="speedIn" type="range" min="0" max="6" step="1" value="2">
+        </label>
+      </div>
+
+      <div class="play-grid">
+        <div class="canvas-box">
+          <canvas id="graph" aria-label="Interactive graph. Highlighted vertices show the current clique."></canvas>
+          <div class="anim-status" id="animStatus" hidden aria-live="polite">
+            <div class="anim-counts" id="animCounts"></div>
+            <div class="anim-msg" id="animMsg"></div>
+            <div class="anim-legend">
+              <span><i class="k-r"></i>R: clique being built</span>
+              <span><i class="k-p"></i>P: candidates</span>
+              <span><i class="k-x"></i>X: already covered</span>
+              <span><i class="k-f"></i>vertex in focus</span>
+            </div>
+          </div>
+          <p class="hint" id="hint">Highlighted: the largest maximal clique.</p>
+        </div>
+
+        <div class="side">
+          <div class="compare-wrap"><table class="compare" aria-label="Algorithm comparison on this graph">
+            <thead><tr><th>Algorithm</th><th>Cliques</th><th>Largest</th><th title="Recursive calls made">Search nodes</th><th>Time</th></tr></thead>
+            <tbody id="compareBody"></tbody>
+          </table></div>
+
+          <h4>Maximal cliques <span class="muted" id="cliqueCount"></span></h4>
+          <div class="clique-list" id="cliqueList" role="listbox" aria-label="Maximal cliques, largest first"></div>
+
+          <h4>Size distribution</h4>
+          <div class="mini-hist" id="miniHist"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="results" class="panel">
+      <div class="section-head">
+        <h2>Benchmarks on real graphs</h2>
+        <p>All three algorithms agree on every count. The difference is how long they take to get there.</p>
+      </div>
+
+      <div class="stats" id="datasetStats"></div>
+
+      <h3 class="chart-title">Sequential running time <span class="muted">(log scale)</span></h3>
+      <div class="legend" id="timeLegend"></div>
+      <div id="timeChart" class="time-chart"></div>
+
+      <details class="table-view">
+        <summary>Full timing table, including the parallel builds</summary>
+        <div class="table-scroll"><table id="timeTable"></table></div>
+      </details>
+
+      <h3 class="chart-title">How many maximal cliques of each size</h3>
+      <div class="tabs" role="tablist" id="distTabs"></div>
+      <div id="distChart" class="dist-chart"></div>
+    </section>
+
+    <section class="panel run">
+      <div class="section-head">
+        <h2>Run it yourself</h2>
+      </div>
+<pre><code>git clone https://github.com/rushipatel296/MaximalCliqueEnumeration
+cd MaximalCliqueEnumeration
+make
+./bin/els data/sample.txt
+OMP_NUM_THREADS=8 ./bin/els_parallel data/sample.txt</code></pre>
+      <p>Input is a plain edge list: the first line is <code>n m</code>, then <code>m</code> lines of <code>u v</code> with 0-based vertex ids.
+        The SNAP graphs (<a href="https://snap.stanford.edu/data/wiki-Vote.html">wiki-Vote</a>,
+        <a href="https://snap.stanford.edu/data/email-Enron.html">email-Enron</a>,
+        <a href="https://snap.stanford.edu/data/as-Skitter.html">as-Skitter</a>) need a quick cleanup first: drop duplicate edges and renumber vertices to 0…n−1.</p>
+    </section>
+  </main>
+
+  <footer class="wrap foot">
+    <p>Built by <a href="https://github.com/rushipatel296">Rushi Patel</a> with Khush Bhuta, Daksh Jain, Utkarsh Singhal and Lakshya Maheshwari.</p>
+  </footer>
+
+  <div id="tip" class="tip" role="tooltip" hidden></div>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,3 +1,8 @@
+// ELS with the outer degeneracy loop parallelised using OpenMP.
+// Build: make   Run: ./bin/els_parallel <graph.txt>
+// Threads: OMP_NUM_THREADS=8 ./bin/els_parallel <graph.txt>
+// Input: first line "n m", then m lines "u v" (0-based vertex ids).
+
 #include <bits/stdc++.h>
 #include <omp.h>
 using namespace std;
@@ -88,7 +93,7 @@ private:
         // Process candidates (vertices in P that aren't neighbors of pivot)
         int i = 0;
         int p = (int)P.size();
-        while (i < p) {
+        while (i < (int)P.size()) {
             int v = P[i];
             if (piv_neigh.find(v) != piv_neigh.end()) { // Skip if it is neighbor
                 i++;
@@ -194,7 +199,6 @@ int main(int argc, char* argv[]) {
     for (int i = 0 ; i < m ; ++i) {
         int u, v;
         inputFile >> u >> v;
-        u--; v--; // 0-based indices.
         if (u < 0 || u >= n || v < 0 || v >= n)
             continue;
         graph.addEdge(u, v);
